@@ -1,0 +1,108 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+**/dist/
+**/dist-ssr/
+*.local
+
+# Environment files
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Claude AI settings
+.claude/
+
+# OS files
+Thumbs.db
+*.DS_Store
+desktop.ini
+
+# Test coverage
+coverage/
+*.lcov
+.nyc_output
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Backend specific
+backend/.env
+backend/dist/
+backend/logs/
+backend/tmp/
+
+# Frontend specific  
+frontend/.env.local
+frontend/dist/
+frontend/.vite/
+
+# Scripts directory (for development only)
+scripts/
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+.tmp/
+
+# Package manager locks (optional - uncomment if you want to ignore lock files)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Images and assets that are not part of the source
+image.png
+screenshots/
+*.jpg
+*.jpeg
+*.gif
+!frontend/public/**/*
+!frontend/src/assets/**/*
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Cache directories
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+
+# Debug files
+*.pid
+*.seed
+*.pid.lock
