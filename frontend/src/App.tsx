@@ -1,25 +1,27 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './lib/auth';
-import { LoginPage } from './routes/LoginPage';
-import { DashboardPage } from './routes/DashboardPage';
-import { LeavesPage } from './routes/LeavesPage';
-import { ApprovalsPage } from './routes/ApprovalsPage';
-import { RequestAdminPage } from './routes/RequestAdminPage';
-import { AdminApprovalPage } from './routes/AdminApprovalPage';
-import { LeaveTypesPage } from './routes/LeaveTypesPage';
-import { UsersPage } from './routes/UsersPage';
-import { SettingsPage } from './routes/SettingsPage';
-import { MasterDashboard } from './routes/MasterDashboard';
-import { MasterOrganizations } from './routes/MasterOrganizations';
-import { MasterUsers } from './routes/MasterUsers';
-import { MasterRequests } from './routes/MasterRequests';
-import { Layout } from './components/Layout';
-import './index.css';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { AuthProvider, useAuth } from "./lib/auth";
+import { NotificationProvider } from "./lib/notifications";
+import { LoginPage } from "./routes/LoginPage";
+import { DashboardPage } from "./routes/DashboardPage";
+import { LeavesPage } from "./routes/LeavesPage";
+import { ApprovalsPage } from "./routes/ApprovalsPage";
+import { RequestAdminPage } from "./routes/RequestAdminPage";
+import { AdminApprovalPage } from "./routes/AdminApprovalPage";
+import { LeaveTypesPage } from "./routes/LeaveTypesPage";
+import { UsersPage } from "./routes/UsersPage";
+import { SettingsPage } from "./routes/SettingsPage";
+import { MasterDashboard } from "./routes/MasterDashboard";
+import { MasterOrganizations } from "./routes/MasterOrganizations";
+import { MasterUsers } from "./routes/MasterUsers";
+import { MasterRequests } from "./routes/MasterRequests";
+import { AdminRequestsPage } from "./routes/AdminRequestsPage";
+import { Layout } from "./components/Layout";
+import "./index.css";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
 
-  // Check if user is the master user
   const isMaster = user?.email === import.meta.env.VITE_MASTER_EMAIL;
 
   if (loading) {
@@ -44,18 +46,31 @@ function AppRoutes() {
     <Layout>
       <Routes>
         {isMaster ? (
-          // Master user routes
           <>
-            <Route path="/" element={<Navigate to="/master-dashboard" replace />} />
+            <Route
+              path="/"
+              element={<Navigate to="/master-dashboard" replace />}
+            />
             <Route path="/master-dashboard" element={<MasterDashboard />} />
-            <Route path="/master-dashboard/organizations" element={<MasterOrganizations />} />
+            <Route
+              path="/master-dashboard/organizations"
+              element={<MasterOrganizations />}
+            />
             <Route path="/master-dashboard/users" element={<MasterUsers />} />
-            <Route path="/master-dashboard/requests" element={<MasterRequests />} />
-            <Route path="/login" element={<Navigate to="/master-dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/master-dashboard" replace />} />
+            <Route
+              path="/master-dashboard/requests"
+              element={<MasterRequests />}
+            />
+            <Route
+              path="/login"
+              element={<Navigate to="/master-dashboard" replace />}
+            />
+            <Route
+              path="*"
+              element={<Navigate to="/master-dashboard" replace />}
+            />
           </>
         ) : (
-          // Regular user routes
           <>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -64,8 +79,12 @@ function AppRoutes() {
             <Route path="/request-admin" element={<RequestAdminPage />} />
             <Route path="/leave-types" element={<LeaveTypesPage />} />
             <Route path="/users" element={<UsersPage />} />
+            <Route path="/admin-requests" element={<AdminRequestsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+            <Route
+              path="/login"
+              element={<Navigate to="/dashboard" replace />}
+            />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </>
         )}
@@ -78,7 +97,33 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <NotificationProvider>
+          <AppRoutes />
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: "#363636",
+                color: "#fff",
+              },
+              success: {
+                duration: 3000,
+                iconTheme: {
+                  primary: "#10B981",
+                  secondary: "#fff",
+                },
+              },
+              error: {
+                duration: 5000,
+                iconTheme: {
+                  primary: "#EF4444",
+                  secondary: "#fff",
+                },
+              },
+            }}
+          />
+        </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>
   );

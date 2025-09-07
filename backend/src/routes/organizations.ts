@@ -1,12 +1,18 @@
 import { Hono } from "hono";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import { supabase } from "../services/supabaseClient.js";
+import { cacheService } from "../services/cacheService.js";
+import { updateAdminCount } from "../services/organizationService.js";
 
 const organizations = new Hono();
 
-// Get organization details
 organizations.get("/", authenticate, async (c) => {
   const user = c.get("user");
+
+  const cachedOrg = await cacheService.getOrgSettings(user.organization_id);
+  if (cachedOrg) {
+    return c.json({ organization: cachedOrg });
+  }
 
   const { data: organization, error } = await supabase
     .from("organizations")
@@ -19,10 +25,11 @@ organizations.get("/", authenticate, async (c) => {
     return c.json({ error: "Failed to fetch organization" }, 500);
   }
 
+  await cacheService.cacheOrgSettings(user.organization_id, organization);
+
   return c.json({ organization });
 });
 
-// Update organization settings (Admin only)
 organizations.put("/settings", authenticate, requireAdmin, async (c) => {
   const user = c.get("user");
   const { name, settings } = await c.req.json();
@@ -44,10 +51,11 @@ organizations.put("/settings", authenticate, requireAdmin, async (c) => {
     return c.json({ error: "Failed to update organization" }, 500);
   }
 
+  await cacheService.del(`org_settings:${user.organization_id}`);
+
   return c.json({ organization });
 });
 
-// Get organization users (Admin only)
 organizations.get("/users", authenticate, requireAdmin, async (c) => {
   const user = c.get("user");
   const page = parseInt(c.req.query("page") || "1");
@@ -85,7 +93,6 @@ organizations.get("/users", authenticate, requireAdmin, async (c) => {
   });
 });
 
-// Update user role (Admin only)
 organizations.patch(
   "/users/:userId/role",
   authenticate,
@@ -99,12 +106,10 @@ organizations.patch(
       return c.json({ error: "Invalid role" }, 400);
     }
 
-    // Can't change own role to prevent lockout
     if (userId === user.id) {
       return c.json({ error: "Cannot change your own role" }, 400);
     }
 
-    // Check if user belongs to the same organization
     const { data: targetUser, error: fetchError } = await supabase
       .from("users")
       .select("id, role")
@@ -131,11 +136,26 @@ organizations.patch(
       return c.json({ error: "Failed to update user role" }, 500);
     }
 
+    // Update organization admin count if role changed to/from admin
+    if (role === "admin" || targetUser.role === "admin") {
+      await updateAdminCount(user.organization_id);
+    }
+
+    // Invalidate all caches affected by role change
+    const { cacheService } = await import("../services/cacheService.js");
+    await cacheService.invalidateOnRoleChange(userId, user.organization_id);
+
+    // Send real-time notification about role change
+    const { websocketManager } = await import("../services/websocketManager.js");
+    websocketManager.sendUserUpdate(userId, {
+      type: 'role_updated',
+      user: updatedUser
+    });
+
     return c.json({ user: updatedUser });
   }
 );
 
-// Remove user from organization (Admin only)
 organizations.delete(
   "/users/:userId",
   authenticate,
@@ -144,12 +164,10 @@ organizations.delete(
     const user = c.get("user");
     const userId = c.req.param("userId");
 
-    // Can't delete own account
     if (userId === user.id) {
       return c.json({ error: "Cannot delete your own account" }, 400);
     }
 
-    // Check if user belongs to the same organization
     const { data: targetUser, error: fetchError } = await supabase
       .from("users")
       .select("id")
@@ -161,7 +179,6 @@ organizations.delete(
       return c.json({ error: "User not found" }, 404);
     }
 
-    // Check if user has any pending or approved leave requests
     const { data: activeRequests } = await supabase
       .from("leave_requests")
       .select("id")
@@ -190,19 +207,55 @@ organizations.delete(
   }
 );
 
-// Get organization analytics (Admin only)
+organizations.get("/approvers", authenticate, async (c) => {
+  const user = c.get("user");
+
+  let allowedRoles: string[] = [];
+
+  switch (user.role) {
+    case "team_member":
+      allowedRoles = ["approval_manager", "admin"];
+      break;
+    case "approval_manager":
+      allowedRoles = ["admin"];
+      break;
+    case "admin":
+      allowedRoles = ["admin"];
+      break;
+    default:
+      return c.json({ error: "Invalid role" }, 400);
+  }
+
+  let query = supabase
+    .from("users")
+    .select("id, name, email, role")
+    .eq("organization_id", user.organization_id)
+    .in("role", allowedRoles);
+
+  if (user.role === "approval_manager") {
+    query = query.neq("id", user.id);
+  }
+
+  const { data: approvers, error } = await query.order("name");
+
+  if (error) {
+    console.error("Error fetching approvers:", error);
+    return c.json({ error: "Failed to fetch approvers" }, 500);
+  }
+
+  return c.json({ approvers });
+});
+
 organizations.get("/analytics", authenticate, requireAdmin, async (c) => {
   const user = c.get("user");
   const startDate = c.req.query("startDate");
   const endDate = c.req.query("endDate");
 
-  // Get total users
   const { count: totalUsers } = await supabase
     .from("users")
     .select("id", { count: "exact" })
     .eq("organization_id", user.organization_id);
 
-  // Get leave requests stats
   let leaveQuery = supabase
     .from("leave_requests")
     .select(

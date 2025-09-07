@@ -1,20 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables');
+  throw new Error("Missing Supabase environment variables");
 }
 
 export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
-    persistSession: false
-  }
+    persistSession: false,
+  },
 });
 
-// Database types based on our schema
 export interface Organization {
   id: string;
   name: string;
@@ -30,7 +29,7 @@ export interface User {
   name: string;
   google_id: string;
   organization_id: string;
-  role: 'admin' | 'team_member' | 'approval_manager';
+  role: "admin" | "team_member" | "approval_manager";
   profile_picture?: string;
   created_at: string;
   updated_at: string;
@@ -56,7 +55,7 @@ export interface LeaveRequest {
   start_date: string;
   end_date: string;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  status: "pending" | "approved" | "rejected" | "cancelled";
   approved_by?: string;
   approved_at?: string;
   rejection_reason?: string;

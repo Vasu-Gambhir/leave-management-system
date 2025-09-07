@@ -1,23 +1,19 @@
 import { Hono } from "hono";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
 import { supabase } from "../services/supabaseClient.js";
 import { emailService } from "../services/emailService.js";
 import { config } from "../config/index.js";
-
-console.log("🔥 adminRequests.ts module loaded at", new Date().toISOString());
+import { createNotification } from "./notifications.js";
+import { updateAdminCount } from "../services/organizationService.js";
 
 const adminRequests = new Hono();
 
-// Utility function to check if user is master
 const isMasterUser = (email: string): boolean => {
   return email?.toLowerCase() === config.MASTER_EMAIL?.toLowerCase();
 };
 
-// Get current user's admin request status
 adminRequests.get("/status", authenticate, async (c) => {
   const user = c.get("user");
-
-  // Check if user already has pending request
   const { data: pendingRequest, error } = await supabase
     .from("admin_requests")
     .select("*")
@@ -27,12 +23,10 @@ adminRequests.get("/status", authenticate, async (c) => {
     .single();
 
   if (error && error.code !== "PGRST116") {
-    // PGRST116 = no rows returned
     console.error("Error checking admin request status:", error);
     return c.json({ error: "Failed to check request status" }, 500);
   }
 
-  // Get organization admin count
   const { data: org } = await supabase
     .from("organizations")
     .select("admin_count")
@@ -46,60 +40,94 @@ adminRequests.get("/status", authenticate, async (c) => {
   });
 });
 
-// Submit admin access request
 adminRequests.post("/", authenticate, async (c) => {
-  console.log("🚀 ADMIN REQUEST API CALLED! 🚀");
-  console.log("Timestamp:", new Date().toISOString());
   const user = c.get("user");
   const { targetAdminEmail, message } = await c.req.json();
 
-  // Check if user is already admin
   if (user.role === "admin") {
     return c.json({ error: "You are already an admin" }, 400);
   }
 
-  // Check for existing pending request within 24 hours
-  const { data: existingRequest } = await supabase
+  const twentyFourHoursAgo = new Date(
+    Date.now() - 24 * 60 * 60 * 1000
+  ).toISOString();
+  const { data: existingRequests } = await supabase
     .from("admin_requests")
     .select("*")
     .eq("user_id", user.id)
-    .eq("status", "pending")
-    .gte("expires_at", new Date().toISOString())
-    .single();
+    .or(
+      `status.eq.pending,and(status.in.(approved,denied),requested_at.gte.${twentyFourHoursAgo})`
+    )
+    .order("requested_at", { ascending: false })
+    .limit(1);
 
-  if (existingRequest) {
-    return c.json(
-      {
-        error:
-          "You already have a pending request. Please wait 24 hours before submitting another.",
-      },
-      400
-    );
+  if (existingRequests && existingRequests.length > 0) {
+    const latestRequest = existingRequests[0];
+    if (latestRequest.status === "pending") {
+      return c.json(
+        {
+          error:
+            "You already have a pending request. Please wait for it to be processed.",
+        },
+        400
+      );
+    } else if (
+      latestRequest.status === "denied" ||
+      latestRequest.status === "approved"
+    ) {
+      const requestTime = new Date(latestRequest.requested_at);
+      const timeDiff = Date.now() - requestTime.getTime();
+      const hoursLeft = Math.ceil(
+        (24 * 60 * 60 * 1000 - timeDiff) / (60 * 60 * 1000)
+      );
+
+      return c.json(
+        {
+          error: `You can only submit one admin request per 24 hours. Please wait ${hoursLeft} more hours before submitting another request.`,
+        },
+        400
+      );
+    }
   }
 
-  // Get organization admin count
   const { data: org } = await supabase
     .from("organizations")
     .select("admin_count, domain, name")
     .eq("id", user.organization_id)
     .single();
 
+  // Double-check admin count in case it's out of sync
+  const { count: actualAdminCount } = await supabase
+    .from("users")
+    .select("*", { count: "exact", head: true })
+    .eq("organization_id", user.organization_id)
+    .eq("role", "admin");
+
+  // If admin count is out of sync, update it
+  if (org && org.admin_count !== (actualAdminCount || 0)) {
+    console.log(`Admin count mismatch for org ${org.name}: stored=${org.admin_count}, actual=${actualAdminCount}`);
+    
+    await supabase
+      .from("organizations")
+      .update({ admin_count: actualAdminCount || 0 })
+      .eq("id", user.organization_id);
+    
+    // Update the org object with the correct count
+    org.admin_count = actualAdminCount || 0;
+  }
+
   if (!org) {
     return c.json({ error: "Organization not found" }, 404);
   }
 
-  // Determine target recipient
   let recipientEmail;
   if (org.admin_count > 0) {
-    // Organization has admins - validate target admin email if provided
     if (!targetAdminEmail) {
       return c.json(
         { error: "Please select an admin to send the request to" },
         400
       );
     }
-
-    // Verify the target admin exists in the organization
     const { data: targetAdmin } = await supabase
       .from("users")
       .select("email")
@@ -117,11 +145,9 @@ adminRequests.post("/", authenticate, async (c) => {
 
     recipientEmail = targetAdminEmail;
   } else {
-    // No admins - send to master
     recipientEmail = config.MASTER_EMAIL;
   }
 
-  // Create admin request
   const { data: request, error: requestError } = await supabase
     .from("admin_requests")
     .insert({
@@ -137,16 +163,7 @@ adminRequests.post("/", authenticate, async (c) => {
     console.error("Error creating admin request:", requestError);
     return c.json({ error: "Failed to create admin request" }, 500);
   }
-
-  // Send email notification
   try {
-    console.log("Attempting to send email to:", recipientEmail);
-    console.log("Email service config:", {
-      service: config.EMAIL_SERVICE,
-      user: config.EMAIL_USER,
-      hasPassword: !!config.EMAIL_PASS,
-    });
-
     const approveLink = `${
       process.env.FRONTEND_URL || "http://localhost:5173"
     }/admin-approval?token=${request.approval_token}&action=approve`;
@@ -211,14 +228,25 @@ adminRequests.post("/", authenticate, async (c) => {
       subject,
       emailBody
     );
-
-    console.log("Email sent successfully:", emailResult);
   } catch (emailError) {
-    console.error("Failed to send notification email:", emailError);
-    // Don't fail the request if email fails - but log the detailed error
-    if (emailError instanceof Error) {
-      console.error("Email error details:", emailError.message);
-      console.error("Email error stack:", emailError.stack);
+    console.error("Email error", emailError);
+  }
+
+  // Send real-time update to master dashboard if request goes to master
+  if (!org.admin_count) {
+    try {
+      const { websocketManager } = await import("../services/websocketManager.js");
+      await websocketManager.sendMasterUpdate({
+        type: 'new_admin_request',
+        request: {
+          id: request.id,
+          user: { name: user.name, email: user.email },
+          organization: { name: org.name, domain: org.domain },
+          requested_at: request.requested_at
+        }
+      });
+    } catch (error) {
+      console.error("Error sending master update:", error);
     }
   }
 
@@ -233,7 +261,6 @@ adminRequests.post("/", authenticate, async (c) => {
   });
 });
 
-// Get organization admins (for dropdown in request form)
 adminRequests.get("/org-admins", authenticate, async (c) => {
   const user = c.get("user");
 
@@ -252,7 +279,170 @@ adminRequests.get("/org-admins", authenticate, async (c) => {
   return c.json({ admins: admins || [] });
 });
 
-// Approve/Deny admin request (via email link)
+adminRequests.get("/pending", authenticate, requireAdmin, async (c) => {
+  const user = c.get("user");
+
+  const { data: requests, error } = await supabase
+    .from("admin_requests")
+    .select(
+      `
+      *,
+      users!inner(id, name, email, organization_id)
+    `
+    )
+    .eq("users.organization_id", user.organization_id)
+    .eq("status", "pending")
+    .not("target_admin_email", "is", null) // Only show requests meant for organization admins
+    .gte("expires_at", new Date().toISOString())
+    .order("requested_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching admin requests:", error);
+    return c.json({ error: "Failed to fetch admin requests" }, 500);
+  }
+
+  return c.json({ requests: requests || [] });
+});
+
+adminRequests.post("/approve", authenticate, requireAdmin, async (c) => {
+  const user = c.get("user");
+  const { requestId, action, reason } = await c.req.json();
+
+  if (!requestId || !action) {
+    return c.json({ error: "Missing requestId or action" }, 400);
+  }
+
+  if (!["approve", "deny"].includes(action)) {
+    return c.json({ error: "Invalid action" }, 400);
+  }
+  const { data: request, error: fetchError } = await supabase
+    .from("admin_requests")
+    .select(
+      `
+      *,
+      users!inner(id, name, email, organization_id)
+    `
+    )
+    .eq("id", requestId)
+    .eq("users.organization_id", user.organization_id)
+    .eq("status", "pending")
+    .single();
+
+  if (fetchError || !request) {
+    return c.json({ error: "Request not found or access denied" }, 404);
+  }
+
+  if (new Date(request.expires_at) < new Date()) {
+    await supabase
+      .from("admin_requests")
+      .update({ status: "expired" })
+      .eq("id", request.id);
+
+    return c.json({ error: "Request has expired" }, 400);
+  }
+  const newStatus = action === "approve" ? "approved" : "denied";
+  const processedAt = new Date().toISOString();
+
+  const { error: updateError } = await supabase
+    .from("admin_requests")
+    .update({
+      status: newStatus,
+      processed_at: processedAt,
+      processed_by: user.email,
+      reason: action === "deny" ? reason : null,
+    })
+    .eq("id", request.id);
+
+  if (updateError) {
+    console.error("Error updating admin request:", updateError);
+    return c.json({ error: "Failed to process request" }, 500);
+  }
+
+  if (action === "approve") {
+    const { data: updatedUser, error: roleUpdateError } = await supabase
+      .from("users")
+      .update({ role: "admin" })
+      .eq("id", request.users.id)
+      .select()
+      .single();
+
+    if (roleUpdateError) {
+      console.error("Error updating user role:", roleUpdateError);
+      return c.json({ error: "Failed to update user role" }, 500);
+    }
+
+    // Update organization admin count
+    await updateAdminCount(request.users.organization_id);
+
+    // Invalidate all caches affected by role change
+    const { cacheService } = await import("../services/cacheService.js");
+    await cacheService.invalidateOnRoleChange(request.users.id, request.users.organization_id);
+
+    // Send real-time notification about role change
+    const { websocketManager } = await import("../services/websocketManager.js");
+    websocketManager.sendUserUpdate(request.users.id, {
+      type: 'role_updated',
+      user: updatedUser
+    });
+  }
+
+  try {
+    const subject = `Admin Request ${
+      action === "approve" ? "Approved" : "Denied"
+    }`;
+    const emailBody = `
+      <h2>Your admin request has been ${
+        action === "approve" ? "approved" : "denied"
+      }</h2>
+      <p><strong>Processed by:</strong> ${user.name} (${user.email})</p>
+      <p><strong>Decision Date:</strong> ${new Date(
+        processedAt
+      ).toLocaleString()}</p>
+      
+      ${
+        action === "approve"
+          ? `<p style="color: #10B981;">✓ Congratulations! You now have admin access.</p>`
+          : `<p style="color: #EF4444;">✗ Your admin request has been denied.</p>
+           ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ""}`
+      }
+    `;
+
+    await emailService.sendEmail(request.users.email, subject, emailBody);
+  } catch (emailError) {
+    console.error("Failed to send notification email:", emailError);
+  }
+
+  const notificationType =
+    action === "approve" ? "admin_request_approved" : "admin_request_denied";
+  const title =
+    action === "approve" ? "Admin Request Approved" : "Admin Request Denied";
+  const message =
+    action === "approve"
+      ? "Congratulations! Your admin request has been approved. You now have admin access."
+      : `Your admin request has been denied${reason ? `: ${reason}` : ""}`;
+
+  await createNotification(
+    request.users.id,
+    user.id,
+    notificationType,
+    title,
+    message,
+    {
+      admin_request_id: request.id,
+      processed_by: user.email,
+      processed_at: processedAt,
+      reason: reason || null,
+    }
+  );
+
+  return c.json({
+    message: `Request ${
+      action === "approve" ? "approved" : "denied"
+    } successfully`,
+    status: newStatus,
+  });
+});
+
 adminRequests.post("/process", async (c) => {
   const { token, action, reason } = await c.req.json();
 
@@ -264,7 +454,6 @@ adminRequests.post("/process", async (c) => {
     return c.json({ error: "Invalid action" }, 400);
   }
 
-  // Find the admin request
   const { data: request, error: fetchError } = await supabase
     .from("admin_requests")
     .select(
@@ -282,9 +471,7 @@ adminRequests.post("/process", async (c) => {
     return c.json({ error: "Invalid or expired request token" }, 404);
   }
 
-  // Check if request has expired
   if (new Date(request.expires_at) < new Date()) {
-    // Mark as expired
     await supabase
       .from("admin_requests")
       .update({ status: "expired" })
@@ -293,11 +480,9 @@ adminRequests.post("/process", async (c) => {
     return c.json({ error: "Request has expired" }, 400);
   }
 
-  // Process the request
   const newStatus = action === "approve" ? "approved" : "denied";
   const processedAt = new Date().toISOString();
 
-  // Update request status
   const { error: updateError } = await supabase
     .from("admin_requests")
     .update({
@@ -313,20 +498,34 @@ adminRequests.post("/process", async (c) => {
     return c.json({ error: "Failed to process request" }, 500);
   }
 
-  // If approved, update user role to admin
   if (action === "approve") {
-    const { error: roleUpdateError } = await supabase
+    const { data: updatedUser, error: roleUpdateError } = await supabase
       .from("users")
       .update({ role: "admin" })
-      .eq("id", request.users.id);
+      .eq("id", request.users.id)
+      .select()
+      .single();
 
     if (roleUpdateError) {
       console.error("Error updating user role:", roleUpdateError);
       return c.json({ error: "Failed to update user role" }, 500);
     }
+
+    // Update organization admin count
+    await updateAdminCount(request.users.organization_id);
+
+    // Invalidate all caches affected by role change
+    const { cacheService } = await import("../services/cacheService.js");
+    await cacheService.invalidateOnRoleChange(request.users.id, request.users.organization_id);
+
+    // Send real-time notification about role change
+    const { websocketManager } = await import("../services/websocketManager.js");
+    websocketManager.sendUserUpdate(request.users.id, {
+      type: 'role_updated',
+      user: updatedUser
+    });
   }
 
-  // Send notification email to requester
   try {
     const subject = `Admin Request ${
       action === "approve" ? "Approved" : "Denied"
@@ -361,7 +560,6 @@ adminRequests.post("/process", async (c) => {
     await emailService.sendEmail(request.users.email, subject, emailBody);
   } catch (emailError) {
     console.error("Failed to send notification email:", emailError);
-    // Don't fail the request if email fails
   }
 
   return c.json({

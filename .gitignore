@@ -65,7 +65,7 @@ frontend/dist/
 frontend/.vite/
 
 # Scripts directory (for development only)
-scripts/
+# scripts/
 
 # Docker
 docker-compose.override.yml

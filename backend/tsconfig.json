@@ -11,10 +11,10 @@
     "lib": ["ESNext"],
     "types": ["node"],
 
-    // Other Outputs
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
+    // Other Outputs (optimized for memory)
+    "sourceMap": false, // disable source maps for production builds to save memory
+    "declaration": false, // disable .d.ts files to save memory
+    "declarationMap": false,
 
     // Stricter Typechecking Options
     "noUncheckedIndexedAccess": true,
@@ -22,11 +22,20 @@
 
     // Recommended Options
     "strict": true,
-    "skipLibCheck": true,
+
+    // ✅ Performance Optimizations
+    "skipLibCheck": true, // don't check .d.ts files (huge memory saver)
+    "incremental": true, // only rebuild changed files
+    "tsBuildInfoFile": "./.tsbuildinfo", // cache build info
+    "noEmitOnError": false, // still emit JS even if types fail
+    "composite": false, // avoids unnecessary project references
+    "isolatedModules": true, // compile each file separately (memory efficient)
+    "forceConsistentCasingInFileNames": true
 
     // Extra Safety
-    "noUncheckedSideEffectImports": true,
-    "isolatedModules": true
+    // ⚠️ "noUncheckedSideEffectImports" is experimental, may cause extra memory usage
+    // If you don’t rely on it heavily, consider removing it.
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "tests", "**/*.test.ts"] // ✅ reduce files compiled
 }

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../lib/auth';
-import { api } from '../lib/api';
+import { useState, useEffect } from "react";
+import { useAuth } from "../lib/auth";
+import { api } from "../lib/api";
 
 interface AdminRequestStatus {
   hasPendingRequest: boolean;
@@ -17,12 +17,12 @@ interface Admin {
 export function RequestAdminPage() {
   const [status, setStatus] = useState<AdminRequestStatus | null>(null);
   const [admins, setAdmins] = useState<Admin[]>([]);
-  const [selectedAdmin, setSelectedAdmin] = useState('');
-  const [message, setMessage] = useState('');
+  const [selectedAdmin, setSelectedAdmin] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const { user } = useAuth();
 
   useEffect(() => {
@@ -32,25 +32,27 @@ export function RequestAdminPage() {
 
   const fetchRequestStatus = async () => {
     try {
-      const response = await api.get('/admin-requests/status');
+      const response = await api.get("/admin-requests/status");
       setStatus(response.data);
     } catch (err: any) {
-      console.error('Error fetching request status:', err);
-      setError('Failed to load request status: ' + (err.response?.data?.error || err.message));
+      console.error("Error fetching request status:", err);
+      setError(
+        "Failed to load request status: " +
+          (err.response?.data?.error || err.message)
+      );
     }
   };
 
   const fetchOrgAdmins = async () => {
     try {
-      const response = await api.get('/admin-requests/org-admins');
+      const response = await api.get("/admin-requests/org-admins");
       setAdmins(response.data.admins || []);
-      
-      // Auto-select first admin if only one exists
+
       if (response.data.admins && response.data.admins.length === 1) {
         setSelectedAdmin(response.data.admins[0].email);
       }
     } catch (err: any) {
-      console.error('Error fetching admins:', err);
+      console.error("Error fetching admins:", err);
     } finally {
       setLoading(false);
     }
@@ -60,23 +62,27 @@ export function RequestAdminPage() {
     if (!status) return;
 
     setSubmitting(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     try {
-      const response = await api.post('/admin-requests', {
-        targetAdminEmail: status.organizationHasAdmin ? selectedAdmin : undefined,
+      const response = await api.post("/admin-requests", {
+        targetAdminEmail: status.organizationHasAdmin
+          ? selectedAdmin
+          : undefined,
         message: message.trim() || undefined,
       });
 
-      setSuccess(response.data.message || 'Admin request submitted successfully!');
-      
-      // Refresh status
+      setSuccess(
+        response.data.message || "Admin request submitted successfully!"
+      );
+
       await fetchRequestStatus();
-      
     } catch (err: any) {
-      console.error('Error submitting admin request:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to submit request');
+      console.error("Error submitting admin request:", err);
+      setError(
+        err.response?.data?.error || err.message || "Failed to submit request"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -90,14 +96,18 @@ export function RequestAdminPage() {
     );
   }
 
-  if (user?.role === 'admin') {
+  if (user?.role === "admin") {
     return (
       <div className="text-center py-12">
         <div className="mx-auto h-12 w-12 text-green-500 mb-4">
           <span className="text-4xl">👑</span>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">You're Already an Admin!</h3>
-        <p className="text-gray-600">You have full administrative privileges for your organization.</p>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          You're Already an Admin!
+        </h3>
+        <p className="text-gray-600">
+          You have full administrative privileges for your organization.
+        </p>
       </div>
     );
   }
@@ -109,9 +119,12 @@ export function RequestAdminPage() {
           <div className="mx-auto h-12 w-12 text-blue-500 mb-4">
             <span className="text-4xl">👑</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Request Admin Access</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Request Admin Access
+          </h1>
           <p className="text-gray-600">
-            Request administrative privileges for your organization's leave management system.
+            Request administrative privileges for your organization's leave
+            management system.
           </p>
         </div>
 
@@ -132,23 +145,38 @@ export function RequestAdminPage() {
             <div className="mx-auto h-12 w-12 text-yellow-500 mb-4">
               <span className="text-4xl">⏳</span>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Request Pending</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Request Pending
+            </h3>
             <p className="text-gray-600 mb-4">
               You have a pending admin request. Please wait for approval.
             </p>
-            
+
             {status.pendingRequest && (
               <div className="bg-gray-50 rounded-lg p-4 text-sm">
                 <div className="space-y-2">
-                  <p><strong>Submitted:</strong> {new Date(status.pendingRequest.requested_at).toLocaleString()}</p>
-                  <p><strong>Expires:</strong> {new Date(status.pendingRequest.expires_at).toLocaleString()}</p>
+                  <p>
+                    <strong>Submitted:</strong>{" "}
+                    {new Date(
+                      status.pendingRequest.requested_at
+                    ).toLocaleString()}
+                  </p>
+                  <p>
+                    <strong>Expires:</strong>{" "}
+                    {new Date(
+                      status.pendingRequest.expires_at
+                    ).toLocaleString()}
+                  </p>
                   {status.pendingRequest.target_admin_email && (
-                    <p><strong>Sent to:</strong> {status.pendingRequest.target_admin_email}</p>
+                    <p>
+                      <strong>Sent to:</strong>{" "}
+                      {status.pendingRequest.target_admin_email}
+                    </p>
                   )}
                 </div>
               </div>
             )}
-            
+
             <p className="text-sm text-gray-500 mt-4">
               You can submit a new request in 24 hours if this one expires.
             </p>
@@ -156,7 +184,9 @@ export function RequestAdminPage() {
         ) : (
           <div className="space-y-6">
             <div className="bg-blue-50 rounded-lg p-4">
-              <h3 className="font-medium text-blue-900 mb-2">What Admin Access Includes:</h3>
+              <h3 className="font-medium text-blue-900 mb-2">
+                What Admin Access Includes:
+              </h3>
               <ul className="text-sm text-blue-800 space-y-1">
                 <li>• Approve or deny leave requests</li>
                 <li>• Manage leave types and policies</li>
@@ -166,7 +196,7 @@ export function RequestAdminPage() {
               </ul>
             </div>
 
-{status?.organizationHasAdmin ? (
+            {status?.organizationHasAdmin ? (
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -188,24 +218,28 @@ export function RequestAdminPage() {
               </div>
             ) : (
               <div className="bg-yellow-50 rounded-lg p-4">
-                <h3 className="font-medium text-yellow-800 mb-2">No Existing Admins</h3>
+                <h3 className="font-medium text-yellow-800 mb-2">
+                  No Existing Admins
+                </h3>
                 <p className="text-sm text-yellow-700">
-                  Your organization doesn't have any admins yet. Your request will be sent to the 
-                  master administrator for approval.
+                  Your organization doesn't have any admins yet. Your request
+                  will be sent to the master administrator for approval.
                 </p>
               </div>
             )}
 
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
-                Message {status?.organizationHasAdmin ? '(Optional)' : '(Optional)'}
+                Message{" "}
+                {status?.organizationHasAdmin ? "(Optional)" : "(Optional)"}
               </label>
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder={status?.organizationHasAdmin 
-                  ? "Tell the admin why you need admin access..."
-                  : "Tell the master admin why you need admin access for your organization..."
+                placeholder={
+                  status?.organizationHasAdmin
+                    ? "Tell the admin why you need admin access..."
+                    : "Tell the master admin why you need admin access for your organization..."
                 }
                 rows={4}
                 maxLength={500}
@@ -217,18 +251,24 @@ export function RequestAdminPage() {
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="font-medium text-gray-900 mb-2">Request Process:</h3>
+              <h3 className="font-medium text-gray-900 mb-2">
+                Request Process:
+              </h3>
               <ol className="text-sm text-gray-600 space-y-1">
                 <li>1. Your request will be sent via email for approval</li>
                 <li>2. The approver can approve or deny your request</li>
-                <li>3. You'll receive an email notification with the decision</li>
+                <li>
+                  3. You'll receive an email notification with the decision
+                </li>
                 <li>4. If approved, you'll get admin access immediately</li>
               </ol>
             </div>
 
             <button
               onClick={submitRequest}
-              disabled={submitting || (status?.organizationHasAdmin && !selectedAdmin)}
+              disabled={
+                submitting || (status?.organizationHasAdmin && !selectedAdmin)
+              }
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {submitting ? (
@@ -237,7 +277,7 @@ export function RequestAdminPage() {
                   Submitting Request...
                 </>
               ) : (
-                'Submit Admin Request'
+                "Submit Admin Request"
               )}
             </button>
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { api } from '../lib/api';
 
 export function AdminApprovalPage() {
   const [searchParams] = useSearchParams();
@@ -40,35 +41,20 @@ export function AdminApprovalPage() {
     setProcessing(true);
 
     try {
-      const response = await fetch('/api/admin-requests/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token,
-          action,
-          reason: withReason ? reason : undefined,
-        }),
+      const response = await api.post('/admin-requests/process', {
+        token,
+        action,
+        reason: withReason ? reason : undefined,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setResult({
-          success: true,
-          message: data.message || `Request ${action}d successfully!`,
-        });
-      } else {
-        setResult({
-          success: false,
-          message: data.error || `Failed to ${action} request`,
-        });
-      }
-    } catch (err: any) {
+      setResult({
+        success: true,
+        message: response.data.message || `Request ${action}d successfully!`,
+      });
+    } catch (error: any) {
       setResult({
         success: false,
-        message: `Error processing request: ${err.message}`,
+        message: error.response?.data?.error || `Failed to ${action} request`,
       });
     } finally {
       setProcessing(false);
@@ -97,20 +83,23 @@ export function AdminApprovalPage() {
 
   if (result) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 px-4">
         <div className="max-w-md w-full">
-          <div className="bg-white shadow rounded-lg p-6 text-center">
-            <div className={`mx-auto h-12 w-12 mb-4 ${result.success ? 'text-green-500' : 'text-red-500'}`}>
-              <span className="text-4xl">{result.success ? '✅' : '❌'}</span>
+          <div className="bg-white/95 backdrop-blur-sm shadow-2xl rounded-2xl p-8 text-center border border-gray-100 hover:shadow-3xl transition-all duration-300">
+            <div className={`mx-auto h-16 w-16 mb-6 ${result.success ? 'text-green-500' : 'text-red-500'}`}>
+              <span className="text-6xl">{result.success ? '✅' : '❌'}</span>
             </div>
-            <h1 className={`text-xl font-bold mb-2 ${result.success ? 'text-green-900' : 'text-red-900'}`}>
+            <h1 className={`text-2xl font-bold mb-4 ${result.success ? 'text-green-900' : 'text-red-900'}`}>
               {result.success ? 'Success!' : 'Error'}
             </h1>
-            <p className="text-gray-600 mb-6">{result.message}</p>
+            <p className="text-gray-700 mb-8 text-lg leading-relaxed">{result.message}</p>
             {result.success && (
-              <p className="text-sm text-gray-500">
-                The user has been notified via email about your decision.
-              </p>
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-xl border border-indigo-100">
+                <p className="text-sm text-indigo-700 font-medium flex items-center justify-center">
+                  <span className="mr-2">📧</span>
+                  The user has been notified via email about your decision.
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -119,15 +108,15 @@ export function AdminApprovalPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="text-center mb-6">
-            <div className="mx-auto h-12 w-12 text-blue-500 mb-4">
-              <span className="text-4xl">👑</span>
+        <div className="bg-white/95 backdrop-blur-sm shadow-2xl rounded-2xl p-8 border border-gray-100 hover:shadow-3xl transition-all duration-300">
+          <div className="text-center mb-8">
+            <div className="mx-auto h-16 w-16 text-blue-500 mb-6">
+              <span className="text-6xl">👑</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Request Review</h1>
-            <p className="text-gray-600">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-3">Admin Request Review</h1>
+            <p className="text-gray-600 text-lg leading-relaxed">
               Please review this admin access request.
             </p>
           </div>
@@ -143,21 +132,21 @@ export function AdminApprovalPage() {
                   rows={3}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200 font-medium bg-gray-50 hover:bg-white resize-none"
                   placeholder="Explain why this request is being denied..."
                 />
               </div>
-              <div className="flex space-x-3">
+              <div className="flex space-x-4">
                 <button
                   onClick={handleDeny}
                   disabled={processing}
-                  className="flex-1 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                  className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white py-3 px-6 rounded-xl hover:from-red-700 hover:to-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 font-semibold transition-all duration-200 cursor-pointer hover:shadow-xl hover:scale-105"
                 >
                   {processing ? 'Processing...' : 'Confirm Denial'}
                 </button>
                 <button
                   onClick={() => setShowReasonInput(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="flex-1 bg-gray-200 text-gray-700 py-3 px-6 rounded-xl hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 font-semibold transition-all duration-200 cursor-pointer hover:shadow-md"
                 >
                   Cancel
                 </button>
@@ -165,34 +154,40 @@ export function AdminApprovalPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
-                  Someone has requested admin access. Approving this request will grant them 
-                  full administrative privileges including the ability to approve leaves, 
-                  manage users, and configure organization settings.
-                </p>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                <div className="flex items-start">
+                  <span className="text-2xl mr-3">⚠️</span>
+                  <p className="text-sm text-blue-800 leading-relaxed font-medium">
+                    Someone has requested admin access. Approving this request will grant them 
+                    full administrative privileges including the ability to approve leaves, 
+                    manage users, and configure organization settings.
+                  </p>
+                </div>
               </div>
 
-              <div className="flex space-x-3">
+              <div className="flex space-x-4">
                 <button
                   onClick={handleApprove}
                   disabled={processing}
-                  className="flex-1 bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-medium"
+                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-6 rounded-xl hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-semibold transition-all duration-200 cursor-pointer hover:shadow-xl hover:scale-105"
                 >
                   {processing ? 'Processing...' : '✓ Approve Request'}
                 </button>
                 <button
                   onClick={handleDeny}
                   disabled={processing}
-                  className="flex-1 bg-red-600 text-white py-3 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 font-medium"
+                  className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white py-3 px-6 rounded-xl hover:from-red-700 hover:to-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 font-semibold transition-all duration-200 cursor-pointer hover:shadow-xl hover:scale-105"
                 >
                   {processing ? 'Processing...' : '✗ Deny Request'}
                 </button>
               </div>
 
-              <p className="text-xs text-gray-500 text-center">
-                The user will be notified via email about your decision.
-              </p>
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
+                <p className="text-xs text-gray-600 text-center font-medium flex items-center justify-center">
+                  <span className="mr-2">📧</span>
+                  The user will be notified via email about your decision.
+                </p>
+              </div>
             </div>
           )}
         </div>

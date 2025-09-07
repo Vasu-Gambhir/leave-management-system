@@ -1,15 +1,13 @@
-import nodemailer from 'nodemailer';
-import { config } from '../config/index.js';
+import nodemailer from "nodemailer";
+import { config } from "../config/index.js";
 
 export class EmailService {
   private transporter;
 
   constructor() {
-    // Use app password for Gmail authentication
-    console.log('Using Gmail app password authentication');
     this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      host: 'smtp.gmail.com',
+      service: "gmail",
+      host: "smtp.gmail.com",
       port: 587,
       secure: false,
       auth: {
@@ -21,16 +19,18 @@ export class EmailService {
       },
     });
 
-    // Verify connection configuration
     this.transporter.verify((error, success) => {
       if (error) {
-        console.error('Email transporter verification failed:', error);
-        console.error('Please ensure:');
-        console.error('1. 2FA is enabled on Gmail account');
-        console.error('2. App password is generated correctly (16 chars, no spaces)');
-        console.error('3. Or use OAuth2 by setting GOOGLE_REFRESH_TOKEN in .env');
+        console.error("Email transporter verification failed:", error);
+        console.error("Please ensure:");
+        console.error("1. 2FA is enabled on Gmail account");
+        console.error(
+          "2. App password is generated correctly (16 chars, no spaces)"
+        );
+        console.error(
+          "3. Or use OAuth2 by setting GOOGLE_REFRESH_TOKEN in .env"
+        );
       } else {
-        console.log('Email server is ready to take our messages');
       }
     });
   }
@@ -56,9 +56,17 @@ export class EmailService {
             <h3 style="margin-top: 0;">Request Details</h3>
             <p><strong>Employee:</strong> ${data.employeeName}</p>
             <p><strong>Leave Type:</strong> ${data.leaveType}</p>
-            <p><strong>Start Date:</strong> ${new Date(data.startDate).toLocaleDateString()}</p>
-            <p><strong>End Date:</strong> ${new Date(data.endDate).toLocaleDateString()}</p>
-            ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ''}
+            <p><strong>Start Date:</strong> ${new Date(
+              data.startDate
+            ).toLocaleDateString()}</p>
+            <p><strong>End Date:</strong> ${new Date(
+              data.endDate
+            ).toLocaleDateString()}</p>
+            ${
+              data.reason
+                ? `<p><strong>Reason:</strong> ${data.reason}</p>`
+                : ""
+            }
           </div>
           
           <p>Please log in to the Leave Management System to review and approve this request.</p>
@@ -68,9 +76,8 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log('Leave request notification sent successfully');
     } catch (error) {
-      console.error('Error sending leave request notification:', error);
+      console.error("Error sending leave request notification:", error);
       throw error;
     }
   }
@@ -81,16 +88,17 @@ export class EmailService {
     leaveType: string;
     startDate: string;
     endDate: string;
-    status: 'approved' | 'rejected';
+    status: "approved" | "rejected";
     approverName: string;
     rejectionReason?: string;
   }) {
-    const subject = data.status === 'approved' 
-      ? `Leave Request Approved - ${data.leaveType}`
-      : `Leave Request Rejected - ${data.leaveType}`;
+    const subject =
+      data.status === "approved"
+        ? `Leave Request Approved - ${data.leaveType}`
+        : `Leave Request Rejected - ${data.leaveType}`;
 
-    const statusColor = data.status === 'approved' ? '#28a745' : '#dc3545';
-    const statusText = data.status === 'approved' ? 'APPROVED' : 'REJECTED';
+    const statusColor = data.status === "approved" ? "#28a745" : "#dc3545";
+    const statusText = data.status === "approved" ? "APPROVED" : "REJECTED";
 
     const mailOptions = {
       from: config.EMAIL_USER,
@@ -108,15 +116,26 @@ export class EmailService {
             <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <h3 style="margin-top: 0;">Request Details</h3>
               <p><strong>Leave Type:</strong> ${data.leaveType}</p>
-              <p><strong>Start Date:</strong> ${new Date(data.startDate).toLocaleDateString()}</p>
-              <p><strong>End Date:</strong> ${new Date(data.endDate).toLocaleDateString()}</p>
-              <p><strong>${data.status === 'approved' ? 'Approved' : 'Rejected'} by:</strong> ${data.approverName}</p>
-              ${data.rejectionReason ? `<p><strong>Reason for Rejection:</strong> ${data.rejectionReason}</p>` : ''}
+              <p><strong>Start Date:</strong> ${new Date(
+                data.startDate
+              ).toLocaleDateString()}</p>
+              <p><strong>End Date:</strong> ${new Date(
+                data.endDate
+              ).toLocaleDateString()}</p>
+              <p><strong>${
+                data.status === "approved" ? "Approved" : "Rejected"
+              } by:</strong> ${data.approverName}</p>
+              ${
+                data.rejectionReason
+                  ? `<p><strong>Reason for Rejection:</strong> ${data.rejectionReason}</p>`
+                  : ""
+              }
             </div>
             
-            ${data.status === 'approved' 
-              ? '<p>Your leave has been added to the calendar. Enjoy your time off!</p>'
-              : '<p>If you have any questions about this decision, please contact your manager.</p>'
+            ${
+              data.status === "approved"
+                ? "<p>Your leave has been added to the calendar. Enjoy your time off!</p>"
+                : "<p>If you have any questions about this decision, please contact your manager.</p>"
             }
           </div>
         </div>
@@ -125,9 +144,8 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log('Leave approval notification sent successfully');
     } catch (error) {
-      console.error('Error sending leave approval notification:', error);
+      console.error("Error sending leave approval notification:", error);
       throw error;
     }
   }
@@ -150,14 +168,20 @@ export class EmailService {
           </div>
           
           <div style="padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px;">
-            <p><strong>${data.employeeName}</strong> has cancelled their leave request.</p>
+            <p><strong>${
+              data.employeeName
+            }</strong> has cancelled their leave request.</p>
             
             <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <h3 style="margin-top: 0;">Cancelled Request Details</h3>
               <p><strong>Employee:</strong> ${data.employeeName}</p>
               <p><strong>Leave Type:</strong> ${data.leaveType}</p>
-              <p><strong>Start Date:</strong> ${new Date(data.startDate).toLocaleDateString()}</p>
-              <p><strong>End Date:</strong> ${new Date(data.endDate).toLocaleDateString()}</p>
+              <p><strong>Start Date:</strong> ${new Date(
+                data.startDate
+              ).toLocaleDateString()}</p>
+              <p><strong>End Date:</strong> ${new Date(
+                data.endDate
+              ).toLocaleDateString()}</p>
             </div>
             
             <p>The calendar event has been removed if it was previously created.</p>
@@ -168,17 +192,14 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log('Leave cancellation notification sent successfully');
     } catch (error) {
-      console.error('Error sending leave cancellation notification:', error);
+      console.error("Error sending leave cancellation notification:", error);
       throw error;
     }
   }
 
   async sendEmail(to: string, subject: string, htmlContent: string) {
     try {
-      console.log('Attempting to send email:', { to, subject, from: config.EMAIL_USER });
-      
       const info = await this.transporter.sendMail({
         from: config.EMAIL_USER,
         to,
@@ -186,15 +207,9 @@ export class EmailService {
         html: htmlContent,
       });
 
-      console.log('Email sent successfully:', info.messageId);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Error sending email:', error);
-      console.error('Email config debug:', {
-        user: config.EMAIL_USER,
-        hasPassword: !!config.EMAIL_PASS,
-        passwordLength: config.EMAIL_PASS?.length || 0
-      });
+      console.error("Error sending email:", error);
       throw error;
     }
   }
@@ -209,8 +224,8 @@ export class EmailService {
     denyLink: string,
     isRequestToMaster: boolean = false
   ) {
-    const subject = isRequestToMaster 
-      ? `New Admin Request for ${organizationName}` 
+    const subject = isRequestToMaster
+      ? `New Admin Request for ${organizationName}`
       : `Admin Access Request from ${requesterName}`;
 
     const htmlContent = `
@@ -248,15 +263,19 @@ export class EmailService {
               <p><strong>Request Date:</strong> ${new Date().toLocaleString()}</p>
             </div>
             
-            ${isRequestToMaster ? `
+            ${
+              isRequestToMaster
+                ? `
               <p>This user is requesting admin access for their organization. As the master administrator, 
               you have the authority to approve or deny this request.</p>
               <p>Approving this request will grant the user full administrative privileges for their organization.</p>
-            ` : `
+            `
+                : `
               <p>This user is requesting admin access to your organization. As an existing admin, 
               you can approve or deny this request.</p>
               <p>Approving this request will grant them the same administrative privileges as you.</p>
-            `}
+            `
+            }
             
             <div style="text-align: center; margin: 30px 0;">
               <a href="${approveLink}" class="button approve">✓ Approve Request</a>
@@ -280,11 +299,13 @@ export class EmailService {
     requesterEmail: string,
     requesterName: string,
     organizationName: string,
-    status: 'approved' | 'denied',
+    status: "approved" | "denied",
     reason?: string
   ) {
-    const subject = `Admin Request ${status === 'approved' ? 'Approved' : 'Denied'} - ${organizationName}`;
-    const isApproved = status === 'approved';
+    const subject = `Admin Request ${
+      status === "approved" ? "Approved" : "Denied"
+    } - ${organizationName}`;
+    const isApproved = status === "approved";
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -296,7 +317,9 @@ export class EmailService {
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: ${isApproved ? '#10B981' : '#EF4444'}; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+          .header { background-color: ${
+            isApproved ? "#10B981" : "#EF4444"
+          }; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
           .content { background-color: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
           .status { text-align: center; font-size: 24px; margin: 20px 0; }
           .approved { color: #10B981; }
@@ -312,8 +335,8 @@ export class EmailService {
           </div>
           
           <div class="content">
-            <div class="status ${isApproved ? 'approved' : 'denied'}">
-              ${isApproved ? '✓ REQUEST APPROVED' : '✗ REQUEST DENIED'}
+            <div class="status ${isApproved ? "approved" : "denied"}">
+              ${isApproved ? "✓ REQUEST APPROVED" : "✗ REQUEST DENIED"}
             </div>
             
             <div class="info-section">
@@ -322,7 +345,9 @@ export class EmailService {
               <p><strong>Decision Date:</strong> ${new Date().toLocaleString()}</p>
             </div>
             
-            ${isApproved ? `
+            ${
+              isApproved
+                ? `
               <div class="info-section">
                 <h3>🎉 Congratulations!</h3>
                 <p>You now have admin access to your organization's leave management system.</p>
@@ -336,15 +361,17 @@ export class EmailService {
                 </ul>
                 <p>Please log back into the system to access your new admin features.</p>
               </div>
-            ` : `
+            `
+                : `
               <div class="info-section">
                 <h3>Request Denied</h3>
                 <p>Unfortunately, your admin request has been denied.</p>
-                ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+                ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ""}
                 <p>You can submit a new request in 24 hours if needed.</p>
                 <p>If you have questions about this decision, please contact your organization's admin directly.</p>
               </div>
-            `}
+            `
+            }
           </div>
         </div>
       </body>

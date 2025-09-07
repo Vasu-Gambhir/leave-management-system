@@ -9,27 +9,28 @@ const configSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
 
-  // Supabase
   SUPABASE_URL: z.string(),
   SUPABASE_SERVICE_ROLE_KEY: z.string(),
 
-  // Google OAuth
   GOOGLE_CLIENT_ID: z.string(),
   GOOGLE_CLIENT_SECRET: z.string(),
   GOOGLE_REDIRECT_URI: z.string(),
   GOOGLE_REFRESH_TOKEN: z.string().optional(),
   GOOGLE_ACCESS_TOKEN: z.string().optional(),
 
-  // JWT
   JWT_SECRET: z.string(),
 
-  // Email
   EMAIL_SERVICE: z.string().default("gmail"),
   EMAIL_USER: z.string(),
   EMAIL_PASS: z.string(),
 
-  // Master User
   MASTER_EMAIL: z.string(),
+
+  REDIS_URL: z.string().default("redis://localhost:6379"),
+  REDIS_ENABLED: z
+    .string()
+    .default("true")
+    .transform((val) => val === "true"),
 
   // Slack (optional)
   // SLACK_BOT_TOKEN: z.string().optional(),

@@ -1,12 +1,17 @@
 import { Hono } from "hono";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import { supabase } from "../services/supabaseClient.js";
+import { cacheService } from "../services/cacheService.js";
 
 const leaveTypes = new Hono();
 
-// Get all leave types for the organization
 leaveTypes.get("/", authenticate, async (c) => {
   const user = c.get("user");
+
+  const cachedTypes = await cacheService.getLeaveTypes(user.organization_id);
+  if (cachedTypes && cachedTypes.length > 0) {
+    return c.json({ leaveTypes: cachedTypes });
+  }
 
   const { data: types, error } = await supabase
     .from("leave_types")
@@ -19,10 +24,11 @@ leaveTypes.get("/", authenticate, async (c) => {
     return c.json({ error: "Failed to fetch leave types" }, 500);
   }
 
-  return c.json({ leaveTypes: types });
+  await cacheService.cacheLeaveTypes(user.organization_id, types || []);
+
+  return c.json({ leaveTypes: types || [] });
 });
 
-// Create a new leave type (Admin only)
 leaveTypes.post("/", authenticate, requireAdmin, async (c) => {
   const user = c.get("user");
   const {
@@ -33,7 +39,6 @@ leaveTypes.post("/", authenticate, requireAdmin, async (c) => {
     carry_forward_allowed,
   } = await c.req.json();
 
-  // Check if leave type with same name already exists
   const { data: existing } = await supabase
     .from("leave_types")
     .select("id")
@@ -64,10 +69,12 @@ leaveTypes.post("/", authenticate, requireAdmin, async (c) => {
     return c.json({ error: "Failed to create leave type" }, 500);
   }
 
+  // Invalidate all caches affected by leave type changes
+  await cacheService.invalidateOnLeaveTypesChange(user.organization_id);
+
   return c.json({ leaveType }, 201);
 });
 
-// Update a leave type (Admin only)
 leaveTypes.put("/:id", authenticate, requireAdmin, async (c) => {
   const user = c.get("user");
   const leaveTypeId = c.req.param("id");
@@ -80,7 +87,6 @@ leaveTypes.put("/:id", authenticate, requireAdmin, async (c) => {
     is_active,
   } = await c.req.json();
 
-  // Check if leave type belongs to the organization
   const { data: existing, error: fetchError } = await supabase
     .from("leave_types")
     .select("*")
@@ -92,7 +98,6 @@ leaveTypes.put("/:id", authenticate, requireAdmin, async (c) => {
     return c.json({ error: "Leave type not found" }, 404);
   }
 
-  // Check if name is being changed and conflicts with another leave type
   if (name && name !== existing.name) {
     const { data: nameConflict } = await supabase
       .from("leave_types")
@@ -136,15 +141,15 @@ leaveTypes.put("/:id", authenticate, requireAdmin, async (c) => {
     return c.json({ error: "Failed to update leave type" }, 500);
   }
 
+  await cacheService.invalidateOnLeaveTypesChange(user.organization_id);
+
   return c.json({ leaveType });
 });
 
-// Delete a leave type (Admin only)
 leaveTypes.delete("/:id", authenticate, requireAdmin, async (c) => {
   const user = c.get("user");
   const leaveTypeId = c.req.param("id");
 
-  // Check if leave type belongs to the organization
   const { data: existing, error: fetchError } = await supabase
     .from("leave_types")
     .select("*")
@@ -156,7 +161,6 @@ leaveTypes.delete("/:id", authenticate, requireAdmin, async (c) => {
     return c.json({ error: "Leave type not found" }, 404);
   }
 
-  // Check if there are any leave requests using this leave type
   const { data: requests } = await supabase
     .from("leave_requests")
     .select("id")
@@ -183,10 +187,11 @@ leaveTypes.delete("/:id", authenticate, requireAdmin, async (c) => {
     return c.json({ error: "Failed to delete leave type" }, 500);
   }
 
+  await cacheService.invalidateOnLeaveTypesChange(user.organization_id);
+
   return c.json({ message: "Leave type deleted successfully" });
 });
 
-// Toggle leave type active status (Admin only)
 leaveTypes.patch(
   "/:id/toggle-active",
   authenticate,
@@ -195,7 +200,6 @@ leaveTypes.patch(
     const user = c.get("user");
     const leaveTypeId = c.req.param("id");
 
-    // Check if leave type belongs to the organization
     const { data: existing, error: fetchError } = await supabase
       .from("leave_types")
       .select("*")
@@ -221,6 +225,8 @@ leaveTypes.patch(
       console.error("Error updating leave type:", error);
       return c.json({ error: "Failed to update leave type" }, 500);
     }
+
+    await cacheService.invalidateOnLeaveTypesChange(user.organization_id);
 
     return c.json({ leaveType });
   }

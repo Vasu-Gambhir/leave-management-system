@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { HTTPException } from 'hono/http-exception';
+import { HTTPException } from "hono/http-exception";
 import jwt from "jsonwebtoken";
 import { google } from "googleapis";
 import { googleCalendarService } from "../services/googleCalendar.js";
@@ -9,7 +9,6 @@ import { authenticate } from "../middleware/auth.js";
 
 const auth = new Hono();
 
-// Get Google OAuth URL
 auth.get("/google/url", async (c) => {
   try {
     const authUrl = googleCalendarService.getAuthUrl();
@@ -20,28 +19,33 @@ auth.get("/google/url", async (c) => {
   }
 });
 
-// Handle Google OAuth callback
 auth.post("/google/callback", async (c) => {
   try {
     const { code, organizationDomain } = await c.req.json();
 
-    // Get tokens from Google
     const tokens = await googleCalendarService.getTokens(code);
     if (!tokens.access_token) {
-      throw new HTTPException(400, { message: 'Failed to get access token from Google' });
+      throw new HTTPException(400, {
+        message: "Failed to get access token from Google",
+      });
     }
+
+    if (!tokens.refresh_token) {
+      throw new HTTPException(400, {
+        message:
+          "No refresh token received from Google. Please try again and ensure you grant all permissions.",
+      });
+    }
+
     const credentials: any = {
-      access_token: tokens.access_token
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
     };
-    if (tokens.refresh_token) {
-      credentials.refresh_token = tokens.refresh_token;
-    }
     googleCalendarService.setCredentials(credentials);
 
-    // Get user info from Google
     const oauth2 = new google.auth.OAuth2();
     const oauth2Credentials: any = {
-      access_token: tokens.access_token
+      access_token: tokens.access_token,
     };
     if (tokens.refresh_token) {
       oauth2Credentials.refresh_token = tokens.refresh_token;
@@ -55,7 +59,13 @@ auth.post("/google/callback", async (c) => {
       return c.json({ error: "No email found in Google account" }, 400);
     }
 
-    // Check if organization exists or create it
+    // Check if user already exists with different organization before creating org
+    const { data: existingUserAnyOrg } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", googleUser.email)
+      .single();
+
     let organization;
     const { data: existingOrg } = await supabase
       .from("organizations")
@@ -65,15 +75,40 @@ auth.post("/google/callback", async (c) => {
 
     if (existingOrg) {
       organization = existingOrg;
+      
+      // Check if user is trying to join a different organization
+      if (
+        existingUserAnyOrg &&
+        existingUserAnyOrg.organization_id !== organization.id
+      ) {
+        return c.json(
+          {
+            error:
+              "This email is already registered with another organization. Please contact support if you need to transfer your account.",
+          },
+          400
+        );
+      }
     } else {
-      // Create new organization with NO admins initially
+      // Check if user exists with ANY organization before creating new org
+      if (existingUserAnyOrg) {
+        return c.json(
+          {
+            error:
+              "This email is already registered with another organization. Please contact support if you need to transfer your account.",
+          },
+          400
+        );
+      }
+
+      // Create new organization only if user doesn't exist anywhere
       const { data: newOrg, error: orgError } = await supabase
         .from("organizations")
         .insert({
           name: organizationDomain,
           domain: organizationDomain,
           settings: {},
-          admin_count: 0, // All orgs start with 0 admins
+          admin_count: 0,
         })
         .select()
         .single();
@@ -85,21 +120,18 @@ auth.post("/google/callback", async (c) => {
       organization = newOrg;
     }
 
-    // Check if user exists
     let user;
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", googleUser.email)
-      .eq("organization_id", organization.id)
-      .single();
+    const existingUser =
+      existingUserAnyOrg?.organization_id === organization.id
+        ? existingUserAnyOrg
+        : null;
 
     if (existingUser) {
       user = existingUser;
-      // Update user with latest Google info
-      const isMasterUser = googleUser.email?.toLowerCase() === config.MASTER_EMAIL?.toLowerCase();
-      const userRole = isMasterUser ? "admin" : existingUser.role; // Keep existing role unless master
-      
+      const isMasterUser =
+        googleUser.email?.toLowerCase() === config.MASTER_EMAIL?.toLowerCase();
+      const userRole = isMasterUser ? "admin" : existingUser.role;
+
       const { data: updatedUser, error: updateError } = await supabase
         .from("users")
         .update({
@@ -107,7 +139,7 @@ auth.post("/google/callback", async (c) => {
           name: googleUser.name || googleUser.email,
           profile_picture: googleUser.picture,
           google_tokens: tokens,
-          role: userRole, // Update role for master user
+          role: userRole,
         })
         .eq("id", existingUser.id)
         .select()
@@ -117,10 +149,10 @@ auth.post("/google/callback", async (c) => {
         user = updatedUser;
       }
     } else {
-      // Create new user
-      const isMasterUser = googleUser.email?.toLowerCase() === config.MASTER_EMAIL?.toLowerCase();
+      const isMasterUser =
+        googleUser.email?.toLowerCase() === config.MASTER_EMAIL?.toLowerCase();
       const userRole = isMasterUser ? "admin" : "team_member";
-      
+
       const { data: newUser, error: userError } = await supabase
         .from("users")
         .insert({
@@ -142,9 +174,8 @@ auth.post("/google/callback", async (c) => {
       user = newUser;
     }
 
-    // Generate JWT token
     const token = jwt.sign({ userId: user.id }, config.JWT_SECRET, {
-      expiresIn: "7d",
+      expiresIn: "24h",
     });
 
     return c.json({
@@ -164,13 +195,11 @@ auth.post("/google/callback", async (c) => {
   }
 });
 
-// Get current user
 auth.get("/me", authenticate, async (c) => {
   const user = c.get("user");
   return c.json({ user });
 });
 
-// Logout
 auth.post("/logout", authenticate, async (c) => {
   return c.json({ message: "Logged out successfully" });
 });

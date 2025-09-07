@@ -5,27 +5,22 @@ import { supabase } from "../services/supabaseClient.js";
 
 const master = new Hono();
 
-// Get dashboard statistics
 master.get("/stats", authenticate, requireMaster, async (c) => {
   try {
-    // Get total organizations
     const { count: totalOrganizations } = await supabase
       .from("organizations")
       .select("*", { count: "exact", head: true });
 
-    // Get total users
     const { count: totalUsers } = await supabase
       .from("users")
       .select("*", { count: "exact", head: true });
 
-    // Get pending admin requests
     const { count: pendingRequests } = await supabase
       .from("admin_requests")
       .select("*", { count: "exact", head: true })
       .eq("status", "pending")
       .gte("expires_at", new Date().toISOString());
 
-    // Get active organizations (with at least one user)
     const { data: activeOrgsData } = await supabase
       .from("organizations")
       .select("id")
@@ -43,60 +38,59 @@ master.get("/stats", authenticate, requireMaster, async (c) => {
   }
 });
 
-// Get recent activity
 master.get("/activity", authenticate, requireMaster, async (c) => {
   try {
-    // Get recent organizations
     const { data: recentOrgs } = await supabase
       .from("organizations")
       .select("id, name, domain, created_at")
       .order("created_at", { ascending: false })
       .limit(5);
 
-    // Get recent admin requests
     const { data: recentRequests } = await supabase
       .from("admin_requests")
-      .select(`
+      .select(
+        `
         id, requested_at, status,
         users!inner(name, email),
         organizations!inner(name, domain)
-      `)
+      `
+      )
       .order("requested_at", { ascending: false })
       .limit(5);
 
     const activities: any[] = [];
 
-    // Add organization activities
     if (recentOrgs) {
-      recentOrgs.forEach(org => {
+      recentOrgs.forEach((org) => {
         activities.push({
           id: `org_${org.id}`,
           type: "org_created",
           message: `New organization "${org.name}" was created`,
           timestamp: org.created_at,
-          organization: org.name
+          organization: org.name,
         });
       });
     }
 
-    // Add admin request activities
     if (recentRequests) {
-      recentRequests.forEach(req => {
+      recentRequests.forEach((req) => {
         activities.push({
           id: `req_${req.id}`,
           type: "admin_request",
-          message: `Admin access requested by ${req.users.name}`,
+          message: `Admin access requested by ${(req.users as any).name}`,
           timestamp: req.requested_at,
-          organization: req.organizations.name
+          organization: (req.organizations as any).name,
         });
       });
     }
 
-    // Sort all activities by timestamp
-    activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    activities.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
 
     return c.json({
-      activities: activities.slice(0, 10) // Return latest 10 activities
+      activities: activities.slice(0, 10),
     });
   } catch (error) {
     console.error("Error fetching master activity:", error);
@@ -104,19 +98,20 @@ master.get("/activity", authenticate, requireMaster, async (c) => {
   }
 });
 
-// Get all organizations
 master.get("/organizations", authenticate, requireMaster, async (c) => {
   try {
     const { data: organizations, error } = await supabase
       .from("organizations")
-      .select(`
+      .select(
+        `
         id,
         name,
         domain,
         admin_count,
         created_at,
         settings
-      `)
+      `
+      )
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -124,7 +119,6 @@ master.get("/organizations", authenticate, requireMaster, async (c) => {
       return c.json({ error: "Failed to fetch organizations" }, 500);
     }
 
-    // Get user count for each organization
     const orgsWithUserCount = await Promise.all(
       (organizations || []).map(async (org) => {
         const { count: userCount } = await supabase
@@ -134,13 +128,13 @@ master.get("/organizations", authenticate, requireMaster, async (c) => {
 
         return {
           ...org,
-          user_count: userCount || 0
+          user_count: userCount || 0,
         };
       })
     );
 
     return c.json({
-      organizations: orgsWithUserCount
+      organizations: orgsWithUserCount,
     });
   } catch (error) {
     console.error("Error fetching organizations:", error);
@@ -148,45 +142,47 @@ master.get("/organizations", authenticate, requireMaster, async (c) => {
   }
 });
 
-// Delete organization (cascade delete users)
-master.delete("/organizations/:orgId", authenticate, requireMaster, async (c) => {
-  const orgId = c.req.param("orgId");
+master.delete(
+  "/organizations/:orgId",
+  authenticate,
+  requireMaster,
+  async (c) => {
+    const orgId = c.req.param("orgId");
 
-  try {
-    // Get organization details before deletion
-    const { data: org, error: orgError } = await supabase
-      .from("organizations")
-      .select("name, domain")
-      .eq("id", orgId)
-      .single();
+    try {
+      const { data: org, error: orgError } = await supabase
+        .from("organizations")
+        .select("name, domain")
+        .eq("id", orgId)
+        .single();
 
-    if (orgError || !org) {
-      return c.json({ error: "Organization not found" }, 404);
-    }
+      if (orgError || !org) {
+        return c.json({ error: "Organization not found" }, 404);
+      }
 
-    // Delete organization (cascade delete will handle users, leaves, etc.)
-    const { error: deleteError } = await supabase
-      .from("organizations")
-      .delete()
-      .eq("id", orgId);
+      const { error: deleteError } = await supabase
+        .from("organizations")
+        .delete()
+        .eq("id", orgId);
 
-    if (deleteError) {
-      console.error("Error deleting organization:", deleteError);
+      if (deleteError) {
+        console.error("Error deleting organization:", deleteError);
+        return c.json({ error: "Failed to delete organization" }, 500);
+      }
+
+      return c.json({
+        message: `Organization "${org.name}" and all associated data has been deleted successfully`,
+      });
+    } catch (error) {
+      console.error("Error deleting organization:", error);
       return c.json({ error: "Failed to delete organization" }, 500);
     }
-
-    return c.json({
-      message: `Organization "${org.name}" and all associated data has been deleted successfully`
-    });
-  } catch (error) {
-    console.error("Error deleting organization:", error);
-    return c.json({ error: "Failed to delete organization" }, 500);
   }
-});
+);
 
-// Search users across all organizations
 master.get("/users", authenticate, requireMaster, async (c) => {
   const searchQuery = c.req.query("search") || "";
+  const organizationId = c.req.query("organizationId");
   const page = parseInt(c.req.query("page") || "1");
   const limit = parseInt(c.req.query("limit") || "20");
 
@@ -196,7 +192,8 @@ master.get("/users", authenticate, requireMaster, async (c) => {
 
     let query = supabase
       .from("users")
-      .select(`
+      .select(
+        `
         id,
         email,
         name,
@@ -204,13 +201,20 @@ master.get("/users", authenticate, requireMaster, async (c) => {
         profile_picture,
         created_at,
         organizations!inner(name, domain)
-      `, { count: "exact" })
+      `,
+        { count: "exact" }
+      )
       .range(from, to)
       .order("created_at", { ascending: false });
 
-    // Apply search filter if provided
     if (searchQuery) {
-      query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+      query = query.or(
+        `name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`
+      );
+    }
+
+    if (organizationId) {
+      query = query.eq("organization_id", organizationId);
     }
 
     const { data: users, error, count } = await query;
@@ -226,8 +230,8 @@ master.get("/users", authenticate, requireMaster, async (c) => {
         page,
         limit,
         total: count || 0,
-        pages: Math.ceil((count || 0) / limit)
-      }
+        pages: Math.ceil((count || 0) / limit),
+      },
     });
   } catch (error) {
     console.error("Error searching users:", error);
@@ -235,7 +239,6 @@ master.get("/users", authenticate, requireMaster, async (c) => {
   }
 });
 
-// Update user role directly (master override)
 master.patch("/users/:userId/role", authenticate, requireMaster, async (c) => {
   const userId = c.req.param("userId");
   const { role } = await c.req.json();
@@ -259,7 +262,7 @@ master.patch("/users/:userId/role", authenticate, requireMaster, async (c) => {
 
     return c.json({
       message: `User role updated successfully`,
-      user
+      user,
     });
   } catch (error) {
     console.error("Error updating user role:", error);
@@ -267,12 +270,12 @@ master.patch("/users/:userId/role", authenticate, requireMaster, async (c) => {
   }
 });
 
-// Get all pending admin requests across organizations
 master.get("/admin-requests", authenticate, requireMaster, async (c) => {
   try {
     const { data: requests, error } = await supabase
       .from("admin_requests")
-      .select(`
+      .select(
+        `
         id,
         requested_at,
         expires_at,
@@ -280,8 +283,10 @@ master.get("/admin-requests", authenticate, requireMaster, async (c) => {
         approval_token,
         users!inner(id, name, email),
         organizations!inner(id, name, domain)
-      `)
+      `
+      )
       .eq("status", "pending")
+      .is("target_admin_email", null)  // Only show requests meant for master (no existing admins)
       .gte("expires_at", new Date().toISOString())
       .order("requested_at", { ascending: false });
 
@@ -291,7 +296,7 @@ master.get("/admin-requests", authenticate, requireMaster, async (c) => {
     }
 
     return c.json({
-      requests: requests || []
+      requests: requests || [],
     });
   } catch (error) {
     console.error("Error fetching admin requests:", error);
