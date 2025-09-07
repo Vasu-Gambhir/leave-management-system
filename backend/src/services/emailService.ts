@@ -5,7 +5,7 @@ export class EmailService {
   private transporter;
 
   constructor() {
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       service: "gmail",
       host: "smtp.gmail.com",
       port: 587,
@@ -19,7 +19,7 @@ export class EmailService {
       },
     });
 
-    this.transporter.verify((error, success) => {
+    this.transporter.verify((error: any, success: any) => {
       if (error) {
         console.error("Email transporter verification failed:", error);
         console.error("Please ensure:");
