@@ -5,36 +5,34 @@ export class EmailService {
   private transporter;
 
   constructor() {
-    // Only initialize email if credentials are provided
-    if (config.EMAIL_USER && config.EMAIL_PASS) {
-      this.transporter = nodemailer.createTransporter({
-        service: "gmail",
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false,
-        auth: {
-          user: config.EMAIL_USER,
-          pass: config.EMAIL_PASS,
-        },
-        tls: {
-          rejectUnauthorized: false,
-        },
-      });
+    this.transporter = nodemailer.createTransporter({
+      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: config.EMAIL_USER,
+        pass: config.EMAIL_PASS,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
 
-      this.transporter.verify((error, success) => {
-        if (error) {
-          console.warn("Email service disabled - configuration missing or invalid");
-          console.warn("To enable emails, set SMTP_USER and SMTP_PASS in environment variables");
-          // Don't throw error, just disable email functionality
-          this.transporter = null;
-        } else {
-          console.log("✉️ Email service ready");
-        }
-      });
-    } else {
-      console.log("📧 Email service disabled (no credentials provided)");
-      this.transporter = null;
-    }
+    this.transporter.verify((error, success) => {
+      if (error) {
+        console.error("Email transporter verification failed:", error);
+        console.error("Please ensure:");
+        console.error("1. 2FA is enabled on Gmail account");
+        console.error(
+          "2. App password is generated correctly (16 chars, no spaces)"
+        );
+        console.error(
+          "3. Or use OAuth2 by setting GOOGLE_REFRESH_TOKEN in .env"
+        );
+      } else {
+      }
+    });
   }
 
   async sendLeaveRequestNotification(data: {
@@ -77,14 +75,10 @@ export class EmailService {
     };
 
     try {
-      if (this.transporter) {
-        await this.transporter.sendMail(mailOptions);
-      } else {
-        console.log("Email skipped (service disabled):", mailOptions.subject);
-      }
+      await this.transporter.sendMail(mailOptions);
     } catch (error) {
       console.error("Error sending leave request notification:", error);
-      // Don't throw - just log the error
+      throw error;
     }
   }
 
@@ -149,14 +143,10 @@ export class EmailService {
     };
 
     try {
-      if (this.transporter) {
-        await this.transporter.sendMail(mailOptions);
-      } else {
-        console.log("Email skipped (service disabled):", mailOptions.subject);
-      }
+      await this.transporter.sendMail(mailOptions);
     } catch (error) {
       console.error("Error sending leave approval notification:", error);
-      // Don't throw - just log the error
+      throw error;
     }
   }
 
@@ -201,35 +191,26 @@ export class EmailService {
     };
 
     try {
-      if (this.transporter) {
-        await this.transporter.sendMail(mailOptions);
-      } else {
-        console.log("Email skipped (service disabled):", mailOptions.subject);
-      }
+      await this.transporter.sendMail(mailOptions);
     } catch (error) {
       console.error("Error sending leave cancellation notification:", error);
-      // Don't throw - just log the error
+      throw error;
     }
   }
 
   async sendEmail(to: string, subject: string, htmlContent: string) {
     try {
-      if (this.transporter) {
-        const info = await this.transporter.sendMail({
-          from: config.EMAIL_USER,
-          to,
-          subject,
-          html: htmlContent,
-        });
-        return { success: true, messageId: info.messageId };
-      } else {
-        console.log("Email skipped (service disabled):", subject);
-        return { success: false, messageId: null };
-      }
+      const info = await this.transporter.sendMail({
+        from: config.EMAIL_USER,
+        to,
+        subject,
+        html: htmlContent,
+      });
+
+      return { success: true, messageId: info.messageId };
     } catch (error) {
       console.error("Error sending email:", error);
-      // Don't throw - just return failure
-      return { success: false, messageId: null };
+      throw error;
     }
   }
 
