@@ -10,14 +10,17 @@ RUN apk add --no-cache python3 make g++ git
 # Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install ALL dependencies (including dev deps for building)
+RUN npm ci && npm cache clean --force
 
 # Copy source code
 COPY . .
 
 # Build TypeScript with increased memory allocation
 RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
+
+# Remove dev dependencies after build
+RUN npm prune --production
 
 # Remove source files after build to reduce image size
 RUN rm -rf src tsconfig.json
