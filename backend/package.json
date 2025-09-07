@@ -1,5 +1,8 @@
 {
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@hono/node-server": "^1.19.1",
     "@supabase/supabase-js": "^2.57.0",

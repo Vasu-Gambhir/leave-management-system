@@ -47,7 +47,8 @@ app.route("/api/master", master);
 app.route("/api/profile", profile);
 app.route("/api/notifications", notifications);
 
-app.use("/static/*", serveStatic({ root: "./public" }));
+// Remove static serving if no public folder needed
+// app.use("/static/*", serveStatic({ root: "./public" }));
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
