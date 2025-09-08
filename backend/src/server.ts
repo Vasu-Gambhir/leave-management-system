@@ -67,23 +67,22 @@ app.notFound((c) => {
 });
 
 const port = parseInt(config.PORT);
-const wsPort = port + 1; // WebSocket on port 3002
 
 async function startServer() {
   try {
     await redisClient.connect();
 
     console.log(`🚀 Server running on http://localhost:${port}`);
-    console.log(`🔌 WebSocket server available at ws://localhost:${wsPort}`);
+    console.log(`🔌 WebSocket server available at ws://localhost:${port}`);
 
-    const wsServer = createServer();
-    websocketManager.initialize(wsServer);
-    wsServer.listen(wsPort);
-
-    serve({
+    // Start the Hono server and get the server instance
+    const server = serve({
       fetch: app.fetch,
       port,
     });
+    
+    // Initialize WebSocket on the same server
+    websocketManager.initialize(server);
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
