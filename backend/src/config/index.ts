@@ -21,8 +21,13 @@ const configSchema = z.object({
   JWT_SECRET: z.string(),
 
   EMAIL_SERVICE: z.string().default("gmail"),
-  EMAIL_USER: z.string(),
-  EMAIL_PASS: z.string(),
+  EMAIL_USER: z.string().optional(),
+  EMAIL_PASS: z.string().optional(),
+
+  // Brevo Configuration (for production)
+  BREVO_API_KEY: z.string().optional(),
+  BREVO_FROM_EMAIL: z.string().optional(),
+  BREVO_FROM_NAME: z.string().optional(),
 
   MASTER_EMAIL: z.string(),
 
@@ -41,7 +46,7 @@ const validateConfig = () => {
   try {
     return configSchema.parse(process.env);
   } catch (error) {
-    console.error("L Invalid environment configuration:", error);
+    console.error("Invalid environment configuration:", error);
     process.exit(1);
   }
 };

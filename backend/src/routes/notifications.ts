@@ -233,7 +233,7 @@ export async function createNotification(
       title: notification.title,
       message: notification.message,
       data: notification.data,
-      createdAt: notification.created_at,
+      created_at: notification.created_at,
     };
 
     websocketManager.sendNotificationToUser(recipientId, notificationData);

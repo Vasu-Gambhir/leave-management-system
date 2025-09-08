@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import { supabase } from "../services/supabaseClient.js";
-import { emailService } from "../services/emailService.js";
+import { emailService } from "../services/emailFactory.js";
 import { config } from "../config/index.js";
 import { createNotification } from "./notifications.js";
 import { updateAdminCount } from "../services/organizationService.js";

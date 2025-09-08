@@ -31,7 +31,7 @@ export function MasterRequests() {
   useEffect(() => {
     loadRequests();
     connectWebSocket();
-    
+
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
@@ -53,8 +53,9 @@ export function MasterRequests() {
   const connectWebSocket = () => {
     const token = localStorage.getItem("auth_token");
     if (!token) return;
-
-    const wsUrl = `ws://localhost:3002?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${import.meta.env.VITE_WS_URL}?token=${encodeURIComponent(
+      token
+    )}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -65,21 +66,26 @@ export function MasterRequests() {
       try {
         const message = JSON.parse(event.data);
 
-        if (message.type === "master_update" && message.data.type === "new_admin_request") {
+        if (
+          message.type === "master_update" &&
+          message.data.type === "new_admin_request"
+        ) {
           const { request } = message.data;
-          
+
           // Add the new request to the list
           const newRequest: AdminRequest = {
             id: request.id,
             requested_at: request.requested_at,
-            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+            expires_at: new Date(
+              Date.now() + 24 * 60 * 60 * 1000
+            ).toISOString(), // 24 hours from now
             status: "pending",
             approval_token: "", // We don't need this for display
             users: request.user,
             organizations: request.organization,
           };
 
-          setRequests(prev => [newRequest, ...prev]);
+          setRequests((prev) => [newRequest, ...prev]);
 
           // Show notification
           toast.success(
@@ -94,7 +100,7 @@ export function MasterRequests() {
 
     ws.onclose = () => {
       setIsConnected(false);
-      
+
       // Reconnect after 3 seconds
       setTimeout(() => {
         connectWebSocket();
@@ -180,14 +186,18 @@ export function MasterRequests() {
             <span className="animate-pulse mr-2">🔐</span>
             First admin approval system
           </div>
-          <div className={`inline-flex items-center px-3 py-2 rounded-xl text-sm font-semibold ${
-            isConnected 
-              ? "bg-green-500/20 text-green-100" 
-              : "bg-red-500/20 text-red-100"
-          }`}>
-            <div className={`w-2 h-2 rounded-full mr-2 ${
-              isConnected ? "bg-green-400 animate-pulse" : "bg-red-400"
-            }`} />
+          <div
+            className={`inline-flex items-center px-3 py-2 rounded-xl text-sm font-semibold ${
+              isConnected
+                ? "bg-green-500/20 text-green-100"
+                : "bg-red-500/20 text-red-100"
+            }`}
+          >
+            <div
+              className={`w-2 h-2 rounded-full mr-2 ${
+                isConnected ? "bg-green-400 animate-pulse" : "bg-red-400"
+              }`}
+            />
             {isConnected ? "Live Updates" : "Disconnected"}
           </div>
         </div>

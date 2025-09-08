@@ -8,6 +8,7 @@ import { supabase } from "../services/supabaseClient.js";
 import { googleCalendarService } from "../services/googleCalendar.js";
 import { createNotification } from "./notifications.js";
 import { cacheService } from "../services/cacheService.js";
+import { emailService } from "../services/emailFactory.js";
 
 const leaves = new Hono();
 
@@ -292,6 +293,28 @@ leaves.post("/", authenticate, async (c) => {
         requester_name: user.name,
       }
     );
+
+    // Send email notification to the approver
+    try {
+      const { data: approver, error: approverError } = await supabase
+        .from("users")
+        .select("email")
+        .eq("id", requested_approver_id)
+        .single();
+
+      if (!approverError && approver?.email) {
+        await emailService.sendLeaveRequestNotification({
+          to: approver.email,
+          employeeName: user.name,
+          leaveType: leaveType.name,
+          startDate: start_date,
+          endDate: end_date,
+          reason,
+        });
+      }
+    } catch (emailError) {
+      console.error("Error sending leave request email:", emailError);
+    }
   }
 
   await cacheService.invalidateUserLeaveBalance(user.id);
@@ -414,6 +437,22 @@ leaves.patch("/:id/status", authenticate, requireApprovalManager, async (c) => {
       rejection_reason: rejection_reason || null,
     }
   );
+
+  // Send email notification to the employee
+  try {
+    await emailService.sendLeaveApprovalNotification({
+      to: request.users.email,
+      employeeName: request.users.name,
+      leaveType: request.leave_types.name,
+      startDate: request.start_date,
+      endDate: request.end_date,
+      status: status,
+      approverName: user.name,
+      rejectionReason: rejection_reason,
+    });
+  } catch (emailError) {
+    console.error("Error sending leave approval email:", emailError);
+  }
 
   await cacheService.invalidateUserLeaveBalance(request.user_id);
 

@@ -60,7 +60,9 @@ export function NotificationProvider({
     const token = localStorage.getItem("auth_token");
     if (!token) return;
 
-    const wsUrl = `ws://localhost:3002?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${import.meta.env.VITE_WS_URL}?token=${encodeURIComponent(
+      token
+    )}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -81,18 +83,25 @@ export function NotificationProvider({
             break;
 
           case "user_update":
-            if (message.data.type === 'role_updated') {
+            if (message.data.type === "role_updated") {
               // Update the user data in localStorage and trigger auth refresh
               const { user: updatedUser } = message.data;
               localStorage.setItem("user", JSON.stringify(updatedUser));
-              
+
               // Trigger a custom event to notify auth context
-              window.dispatchEvent(new CustomEvent('userUpdated', { 
-                detail: updatedUser 
-              }));
-              
+              window.dispatchEvent(
+                new CustomEvent("userUpdated", {
+                  detail: updatedUser,
+                })
+              );
+
               // Show toast notification
-              toast.success(`Your role has been updated to ${updatedUser.role.replace('_', ' ')}`);
+              toast.success(
+                `Your role has been updated to ${updatedUser.role.replace(
+                  "_",
+                  " "
+                )}`
+              );
             }
             break;
 

@@ -19,7 +19,7 @@ export interface NotificationData {
   title: string;
   message: string;
   data?: Record<string, any>;
-  createdAt: string;
+  created_at: string;
 }
 
 class WebSocketManager {
