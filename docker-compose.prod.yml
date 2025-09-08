@@ -36,11 +36,14 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
-      - SMTP_FROM=${SMTP_FROM}
+      - EMAIL_SERVICE=${EMAIL_SERVICE:-gmail}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - BREVO_API_KEY=${BREVO_API_KEY}
+      - BREVO_FROM_EMAIL=${BREVO_FROM_EMAIL}
+      - BREVO_FROM_NAME=${BREVO_FROM_NAME}
+      - MASTER_EMAIL=${MASTER_EMAIL}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
     depends_on:
       redis:
         condition: service_healthy
@@ -61,6 +64,10 @@ services:
     container_name: leave-app-frontend-prod
     ports:
       - "3000:3000"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:5000/api}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:5000}
+      - VITE_MASTER_EMAIL=${MASTER_EMAIL}
     depends_on:
       - backend
     restart: unless-stopped

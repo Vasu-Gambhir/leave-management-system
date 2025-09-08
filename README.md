@@ -5,6 +5,7 @@ A comprehensive leave management system built with React (Frontend) and Hono.js 
 ## 🚀 Features
 
 ### Core Features
+
 - **Multi-tenant Organization Support**: Separate organizations with isolated data
 - **Role-based Access Control**: Master, Admin, Approval Manager, and Team Member roles
 - **Leave Request Management**: Create, approve, reject leave requests with detailed workflow
@@ -17,6 +18,7 @@ A comprehensive leave management system built with React (Frontend) and Hono.js 
 - **Comprehensive Pagination**: Efficient data loading with pagination support
 
 ### Advanced Features
+
 - **Real-time Dashboard Updates**: Live updates for master and admin dashboards
 - **Intelligent Cache Management**: Event-driven cache invalidation for data consistency
 - **Google OAuth Integration**: Secure calendar access with refresh token handling
@@ -29,6 +31,7 @@ A comprehensive leave management system built with React (Frontend) and Hono.js 
 ## 🛠 Tech Stack
 
 ### Frontend
+
 - **React 18** with TypeScript
 - **Tailwind CSS** for styling
 - **React Router** for navigation
@@ -36,6 +39,7 @@ A comprehensive leave management system built with React (Frontend) and Hono.js 
 - **WebSocket** for real-time updates
 
 ### Backend
+
 - **Hono.js** - Modern web framework
 - **TypeScript** - Type safety
 - **Supabase** - Database and authentication
@@ -72,6 +76,7 @@ node scripts/migrate.js
 ```
 
 The migration script will create all necessary tables:
+
 - `organizations` - Organization data
 - `users` - User accounts and roles
 - `leave_types` - Configurable leave categories
@@ -110,12 +115,18 @@ GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_REDIRECT_URI=http://localhost:5000/auth/google/callback
 
-# Email Configuration
-SMTP_HOST=your_smtp_host
-SMTP_PORT=587
-SMTP_USER=your_email_username
-SMTP_PASS=your_email_password
-SMTP_FROM=noreply@yourdomain.com
+# Email Configuration (Development - SMTP/Gmail)
+EMAIL_SERVICE=gmail
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_specific_password
+
+# Email Configuration (Production - Brevo/SendinBlue)
+BREVO_API_KEY=your_brevo_api_key
+BREVO_FROM_EMAIL=noreply@yourdomain.com
+BREVO_FROM_NAME=Leave Management System
+
+# Master User Email
+MASTER_EMAIL=admin@yourdomain.com
 
 # Server Configuration
 PORT=5000
@@ -127,8 +138,9 @@ NODE_ENV=development
 Create a `.env` file in the `frontend` directory:
 
 ```env
-VITE_API_URL=http://localhost:5000
-VITE_WS_URL=ws://localhost:5000/ws
+VITE_API_URL=http://localhost:5000/api
+VITE_WS_URL=ws://localhost:5000
+VITE_MASTER_EMAIL=admin@yourdomain.com
 ```
 
 ## 🚀 Installation & Setup
@@ -136,7 +148,7 @@ VITE_WS_URL=ws://localhost:5000/ws
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Vasu-Gambhir/leave-management-system.git
 cd leave-management-app
 ```
 
@@ -167,6 +179,7 @@ docker run -d --name redis-leave-app -p 6379:6379 -v redis-data:/data redis:alpi
 #### Option B: Local Installation
 
 **Ubuntu/Debian:**
+
 ```bash
 sudo apt update
 sudo apt install redis-server
@@ -175,6 +188,7 @@ sudo systemctl enable redis-server
 ```
 
 **macOS:**
+
 ```bash
 brew install redis
 brew services start redis
@@ -199,12 +213,21 @@ Download and install Redis from the official website or use WSL.
    - Authorized redirect URIs: `http://localhost:5000/auth/google/callback`
 5. Download the credentials and add to your environment variables
 
-### 5. Set up Email Service (Optional)
+### 5. Set up Email Service
 
-Configure SMTP settings for email notifications:
-- **Gmail**: Use App Passwords with 2FA enabled
-- **SendGrid**: Use API key as password
-- **Other SMTP**: Standard SMTP configuration
+The application uses different email services for development and production:
+
+#### Development (SMTP/Gmail)
+- Enable 2-factor authentication on your Gmail account
+- Generate an App Password: Google Account Settings > Security > 2-Step Verification > App passwords
+- Use the generated password in `EMAIL_PASS`
+
+#### Production (Brevo/SendinBlue)
+1. Create a free account at [Brevo](https://www.brevo.com/)
+2. Go to Settings > API Keys
+3. Create a new API key
+4. Configure sender email in Brevo dashboard
+5. Add the API key to `BREVO_API_KEY`
 
 ### 6. Database Migration
 
@@ -221,7 +244,7 @@ node scripts/migrate.js
 # Start backend (from backend directory)
 npm run dev
 
-# Start frontend (from frontend directory)  
+# Start frontend (from frontend directory)
 npm run dev
 ```
 
@@ -241,44 +264,146 @@ npm run preview
 
 ## 🐳 Docker Setup
 
-### Using Docker Compose (Recommended)
+### Quick Start with Docker Compose
+
+#### Development Setup (with hot-reloading)
 
 ```bash
-# Start all services
+# 1. Clone the repository
+git clone https://github.com/Vasu-Gambhir/leave-management-system.git
+cd leave-management-app
+
+# 2. Copy environment files
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+# 3. Edit the .env files with your actual values
+# - Add Supabase credentials
+# - Add Google OAuth credentials  
+# - Configure email settings (Gmail for dev, Brevo for prod)
+# - Set master email address
+
+# 4. Start all services (Redis, Backend, Frontend)
 docker-compose up -d
 
-# View logs
+# 5. Run database migration
+docker-compose exec backend node scripts/migrate.js
+
+# 6. View logs (optional)
 docker-compose logs -f
+
+# 7. Access the application
+# Frontend: http://localhost:5173
+# Backend API: http://localhost:5000
+# WebSocket: ws://localhost:5000
+```
+
+#### Production Setup
+
+```bash
+# 1. Build and start production containers
+docker-compose -f docker-compose.prod.yml up -d --build
+
+# 2. Run database migration
+docker-compose -f docker-compose.prod.yml exec backend node scripts/migrate.js
+
+# 3. Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:5000
+```
+
+#### Using Local PostgreSQL (Optional)
+
+If you prefer local PostgreSQL instead of Supabase cloud:
+
+```bash
+# Start with local PostgreSQL database
+docker-compose --profile local-db up -d
+
+# The PostgreSQL database will be available at localhost:5432
+# Database name: leave_management
+# Username: postgres
+# Password: postgres
+```
+
+### Docker Commands Reference
+
+```bash
+# Start services
+docker-compose up -d
 
 # Stop services
 docker-compose down
+
+# Rebuild after code changes
+docker-compose up -d --build
+
+# View logs for all services
+docker-compose logs -f
+
+# View logs for specific service
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f redis
+
+# Execute commands in running container
+docker-compose exec backend npm run typecheck
+docker-compose exec backend npm run lint
+
+# Clean everything (including volumes)
+docker-compose down -v
+
+# Production commands
+docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml logs -f
 ```
 
-### Manual Docker Setup
+### Troubleshooting Docker Setup
 
-```bash
-# Build images
-docker build -t leave-app-backend ./backend
-docker build -t leave-app-frontend ./frontend
+1. **Port Already in Use**
+   ```bash
+   # Check what's using the port
+   netstat -ano | findstr :5000  # Windows
+   lsof -i :5000                  # Mac/Linux
+   
+   # Change ports in docker-compose.yml if needed
+   ```
 
-# Run Redis
-docker run -d --name redis -p 6379:6379 redis:alpine
+2. **Container Won't Start**
+   ```bash
+   # Check container logs
+   docker-compose logs backend
+   
+   # Rebuild containers
+   docker-compose down
+   docker-compose up -d --build
+   ```
 
-# Run Backend
-docker run -d --name backend -p 5000:5000 --env-file backend/.env leave-app-backend
+3. **Database Connection Issues**
+   ```bash
+   # Ensure Redis is running
+   docker-compose ps redis
+   
+   # Test Redis connection
+   docker-compose exec redis redis-cli ping
+   ```
 
-# Run Frontend
-docker run -d --name frontend -p 3000:3000 leave-app-frontend
-```
+4. **Permission Issues**
+   ```bash
+   # On Linux/Mac, you might need to run with sudo
+   sudo docker-compose up -d
+   ```
 
 ## 🔗 WebSocket Connection
 
-The application uses WebSockets for real-time updates:
+The application uses WebSockets for real-time updates on the same port as the HTTP server:
 
-- **Connection URL**: `ws://localhost:5000/ws` (development)
+- **Connection URL**: `ws://localhost:5000` (development) - Same port as HTTP
+- **Production URL**: `wss://your-domain.com` (uses same port with WSS upgrade)
 - **Authentication**: JWT token passed as query parameter
-- **Auto-reconnection**: Built-in reconnection logic
-- **Events**: User updates, role changes, leave approvals
+- **Auto-reconnection**: Built-in reconnection logic with exponential backoff
+- **Events**: User updates, role changes, leave approvals, notifications
 
 ### WebSocket Events
 
@@ -314,23 +439,27 @@ The application uses WebSockets for real-time updates:
 ## 👥 User Roles & Permissions
 
 ### Master
+
 - Full system access
 - Manage organizations
 - Approve admin requests
 - System-wide configuration
 
 ### Admin
+
 - Organization management
 - User role assignment
 - Leave type configuration
 - Leave approvals
 
 ### Approval Manager
+
 - Approve/reject leave requests
 - View team leave calendars
 - Generate leave reports
 
 ### Team Member
+
 - Submit leave requests
 - View own leave history
 - Update profile information
@@ -340,6 +469,7 @@ The application uses WebSockets for real-time updates:
 ### Common Issues
 
 1. **Build Memory Errors**
+
    ```bash
    # Increase Node.js memory limit
    export NODE_OPTIONS="--max-old-space-size=8192"
@@ -347,21 +477,24 @@ The application uses WebSockets for real-time updates:
    ```
 
 2. **Redis Connection Issues**
+
    ```bash
    # Check Redis status
    redis-cli ping
-   
+
    # Reset Redis
    docker restart redis-leave-app
    ```
 
 3. **Cache Inconsistency**
+
    ```bash
    # Clear Redis cache
    redis-cli FLUSHALL
    ```
 
 4. **WebSocket Connection Fails**
+
    - Check CORS settings
    - Verify JWT token validity
    - Ensure WebSocket URL is correct
@@ -406,6 +539,7 @@ This project is licensed under the MIT License.
 ## 🐛 Support
 
 For issues and questions:
+
 1. Check the troubleshooting section
 2. Review the logs for specific error messages
 3. Verify environment configuration
