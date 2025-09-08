@@ -75,14 +75,17 @@ async function startServer() {
     console.log(`🚀 Server running on http://localhost:${port}`);
     console.log(`🔌 WebSocket server available at ws://localhost:${port}`);
 
-    // Start the Hono server and get the server instance
+    // Start the Hono server
     const server = serve({
       fetch: app.fetch,
       port,
     });
     
+    // Type assertion to handle the server type properly
+    const httpServer = server as unknown as ReturnType<typeof createServer>;
+    
     // Initialize WebSocket on the same server
-    websocketManager.initialize(server);
+    websocketManager.initialize(httpServer);
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
