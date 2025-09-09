@@ -29,8 +29,8 @@ export class GoogleCalendarService {
       access_type: "offline",
       prompt: "consent",
       scope: [
-        "https://www.googleapis.com/auth/calendar",
-        "https://www.googleapis.com/auth/userinfo.profile",
+        // "https://www.googleapis.com/auth/calendar",
+        // "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/userinfo.email",
       ],
     });
@@ -49,7 +49,9 @@ export class GoogleCalendarService {
       const { credentials } = await this.oauth2Client.refreshAccessToken();
       return {
         access_token: credentials.access_token!,
-        ...(credentials.refresh_token && { refresh_token: credentials.refresh_token }),
+        ...(credentials.refresh_token && {
+          refresh_token: credentials.refresh_token,
+        }),
       };
     } catch (error) {
       throw new Error(
